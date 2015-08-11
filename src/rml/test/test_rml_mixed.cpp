@@ -38,7 +38,7 @@ int TestMain () {
 // non-deterministic. Thus dynamic_link fails on some systems when the
 // application changes its current directory after the library (TBB/OpenMP/...)
 // is loaded but before the static constructors in the library are executed.
-#define CHDIR_SUPPORT_BROKEN ( __GNUC__ == 4 && __GNUC_MINOR__ >= 6 && __GNUC_MINOR__ <= 9 )
+#define CHDIR_SUPPORT_BROKEN ( ( __GNUC__ == 4 && __GNUC_MINOR__ >= 6 && __GNUC_MINOR__ <= 9 ) || (__linux__ && __clang_major__ == 3 && __clang_minor__ == 5) )
 
 const int OMP_ParallelRegionSize = 16;
 int TBB_MaxThread = 4;           // Includes master

@@ -35,6 +35,9 @@
     #error Must define USE_PTHREAD or USE_WINTHREAD
 #endif
 
+// TODO: *BSD also has it
+#define BACKEND_HAS_MREMAP __linux__
+
 #include "tbb/tbb_config.h" // for __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
 #if __TBB_LIBSTDCPP_EXCEPTION_HEADERS_BROKEN
   #define _EXCEPTION_PTR_H /* prevents exception_ptr.h inclusion */
@@ -556,7 +559,7 @@ struct LargeMemoryBlock : public BlockI {
                      *gNext;
     uintptr_t         age;           // age of block while in cache
     size_t            objectSize;    // the size requested by a client
-    size_t            unalignedSize; // the size requested from getMemory
+    size_t            unalignedSize; // the size requested from backend
     BackRefIdx        backRefIdx;    // cached here, used copy is in LargeObjectHdr
 };
 
@@ -564,52 +567,40 @@ struct LargeMemoryBlock : public BlockI {
 class BackendSync {
     // Class instances should reside in zero-initialized memory!
     // The number of blocks currently removed from a bin and not returned back
-    intptr_t  blocksInProcessing;  // to another
-    intptr_t  binsModifications;   // incremented on every bin modification
+    intptr_t inFlyBlocks;         // to another
+    intptr_t binsModifications;   // incremented on every bin modification
+    Backend *backend;
 public:
-    void blockConsumed() { AtomicIncrement(blocksInProcessing); }
+    void init(Backend *b) { backend = b; }
+    void blockConsumed() { AtomicIncrement(inFlyBlocks); }
     void binsModified() { AtomicIncrement(binsModifications); }
     void blockReleased() {
 #if __TBB_MALLOC_BACKEND_STAT
-        MALLOC_ITT_SYNC_RELEASING(&blocksInProcessing);
+        MALLOC_ITT_SYNC_RELEASING(&inFlyBlocks);
 #endif
         AtomicIncrement(binsModifications);
-        intptr_t prev = AtomicAdd(blocksInProcessing, -1);
+        intptr_t prev = AtomicAdd(inFlyBlocks, -1);
         MALLOC_ASSERT(prev > 0, ASSERT_TEXT);
         suppress_unused_warning(prev);
     }
     intptr_t getNumOfMods() const { return FencedLoad(binsModifications); }
     // return true if need re-do the blocks search
-    bool waitTillBlockReleased(intptr_t startModifiedCnt) {
-#if __TBB_MALLOC_BACKEND_STAT
-        MALLOC_ITT_SYNC_PREPARE(&blocksInProcessing);
-#endif
-        for (intptr_t myBlocksNum = FencedLoad(blocksInProcessing);
-             // no blocks in processing, stop waiting
-             myBlocksNum; ) {
-            SpinWaitWhileEq(blocksInProcessing, myBlocksNum);
-            WhiteboxTestingYield();
-            intptr_t newBlocksNum = FencedLoad(blocksInProcessing);
-            // stop waiting iff blocks were removed from processing,
-            // if blocks were added, there is no reason to stop waiting
-            if (newBlocksNum < myBlocksNum)
-                break;
-            myBlocksNum = newBlocksNum;
-        }
-#if __TBB_MALLOC_BACKEND_STAT
-        MALLOC_ITT_SYNC_ACQUIRED(&blocksInProcessing);
-#endif
-        // were bins modified since scanned?
-        return startModifiedCnt != getNumOfMods();
-    }
+    inline bool waitTillBlockReleased(intptr_t startModifiedCnt);
 };
 
 class CoalRequestQ { // queue of free blocks that coalescing was delayed
 private:
-    FreeBlock *blocksToFree;
+    FreeBlock   *blocksToFree;
+    BackendSync *bkndSync;
+    // counted blocks in blocksToFree and that are leaved blocksToFree
+    // and still in active coalescing
+    intptr_t     inFlyBlocks;
 public:
+    void init(BackendSync *bSync) { bkndSync = bSync; }
     FreeBlock *getAll(); // return current list of blocks and make queue empty
     void putBlock(FreeBlock *fBlock);
+    inline void blockWasProcessed();
+    intptr_t blocksInFly() const { return FencedLoad(inFlyBlocks); }
 };
 
 class MemExtendingSema {
@@ -644,6 +635,14 @@ enum MemRegionType {
     MEMREG_SEVERAL_BLOCKS,
     // The region holds only one block with a reqested size.
     MEMREG_ONE_BLOCK
+};
+
+class MemRegionList {
+    MallocMutex regionListLock;
+public:
+    MemRegion  *head;
+    void add(MemRegion *r);
+    void remove(MemRegion *r);
 };
 
 class Backend {
@@ -738,8 +737,7 @@ private:
 
     ExtMemoryPool *extMemPool;
     // used for release every region on pool destroying
-    MemRegion     *regionList;
-    MallocMutex    regionListLock;
+    MemRegionList  regionList;
 
     CoalRequestQ   coalescQ; // queue of coalescing requests
     BackendSync    bkndSync;
@@ -764,6 +762,8 @@ private:
     void startUseBlock(MemRegion *region, FreeBlock *fBlock, bool addToBin);
     void releaseRegion(MemRegion *region);
 
+    FreeBlock *releaseMemInCaches(intptr_t startModifiedCnt,
+                                  int *lockedBinsThreshold, int numOfLockedBins);
     FreeBlock *askMemFromOS(size_t totalReqSize, intptr_t startModifiedCnt,
                             int *lockedBinsThreshold, int numOfLockedBins,
                             bool *splittable);
@@ -775,8 +775,7 @@ private:
                             bool needAlignedRes);
 
     FreeBlock *doCoalesc(FreeBlock *fBlock, MemRegion **memRegion);
-    bool coalescAndPutList(FreeBlock *head, bool forceCoalescQDrop);
-    bool scanCoalescQ(bool forceCoalescQDrop);
+    bool coalescAndPutList(FreeBlock *head, bool forceCoalescQDrop, bool reportBlocksProcessed);
     void coalescAndPut(FreeBlock *fBlock, size_t blockSz);
 
     void removeBlockFromBin(FreeBlock *fBlock);
@@ -787,6 +786,8 @@ private:
     void putLargeBlock(LargeMemoryBlock *lmb);
     void releaseCachesToLimit();
 public:
+    bool scanCoalescQ(bool forceCoalescQDrop);
+    intptr_t blocksInCoalescing() const { return coalescQ.blocksInFly(); }
     void verify();
 #if __TBB_MALLOC_BACKEND_STAT
     void reportStat(FILE *f);
@@ -812,6 +813,8 @@ public:
 
     LargeMemoryBlock *getLargeBlock(size_t size);
     void returnLargeObject(LargeMemoryBlock *lmb);
+
+    void *remap(void *ptr, size_t oldSize, size_t newSize, size_t alignment);
 
     void setRecommendedMaxSize(size_t softLimit) {
         memSoftLimit = softLimit;

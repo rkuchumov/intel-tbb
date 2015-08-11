@@ -182,12 +182,16 @@ class test_source_body : WaitThrow<serial_type, TType> {
     tbb::atomic<int> *my_current_val;
     int my_mult;
 public:
-    test_source_body(tbb::atomic<int> &my_cnt, int multiplier = 1) : my_current_val(&my_cnt), my_mult(multiplier) { }
+    test_source_body(tbb::atomic<int> &my_cnt, int multiplier = 1) : my_current_val(&my_cnt), my_mult(multiplier) {
+        REMARK("- --------- - - -   constructed %lx\n", (size_t)(my_current_val));
+    }
 
     bool operator()(OutputType & out) {
         UPDATE_COUNTS();
         out = OutputType(my_mult * ++(*my_current_val));
+        REMARK("xx(%lx) out == %d\n", (size_t)(my_current_val), (int)out);
         if(*my_current_val > g_NumItems) {
+            REMARK(" ------ End of the line!\n");
             *my_current_val = g_NumItems;
             return false;
         }
@@ -1370,7 +1374,13 @@ struct run_one_join_node_test {
             else {
                 ASSERT(!g.exception_thrown(), "Exception flag in flow::graph set but no throw occurred");
                 ASSERT(!g.is_cancelled(), "canceled flag set but no throw occurred");
-                ASSERT(sb0_cnt == g_NumItems, "Missing invocations of source_node0");
+                if(sb0_cnt != g_NumItems) {
+                    REMARK("throwException == %s\n", throwException ? "true" : "false");
+                    REMARK("iter == %d\n", (int)iter);
+                    REMARK("sb0_cnt == %d\n", (int)sb0_cnt);
+                    REMARK("g_NumItems == %d\n", (int)g_NumItems);
+                }
+                ASSERT(sb0_cnt == g_NumItems, "Missing invocations of source_node0");  // this one
                 ASSERT(sb1_cnt == g_NumItems, "Missing invocations of source_node1");
                 ASSERT(nb_cnt == g_NumItems, "Missing items in absorbers");
             }

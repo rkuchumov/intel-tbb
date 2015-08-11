@@ -34,7 +34,7 @@ LIBDL = -ldl
 OPENMP_FLAG = -openmp
 LIBS = -lpthread
 LINK_FLAGS =
-LIB_LINK_FLAGS = -dynamiclib -i-static
+LIB_LINK_FLAGS = -dynamiclib -i-static -install_name @rpath/$(BUILDING_LIBRARY)
 C_FLAGS = $(CPLUS_FLAGS)
 # ICC 11.0 and higher support -std=c++0x
 ifneq (,$(shell icc -dumpversion | egrep  "^1[1-9]\."))

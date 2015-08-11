@@ -298,11 +298,15 @@ struct harness_counting_receiver : public tbb::flow::receiver<T>, NoCopy {
     }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
+    built_predecessors_type mbp;
+    /*override*/ built_predecessors_type &built_predecessors() { return mbp; }
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
     /*override*/void internal_add_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void internal_delete_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void copy_predecessors(predecessor_list_type &) { }
     /*override*/size_t predecessor_count() { return 0; }
+    /*override*/void clear_predecessors() { my_count = 0; };
     /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { my_count = 0; }
 #else
     /*override*/void reset_receiver() { my_count = 0; }
@@ -363,11 +367,15 @@ struct harness_mapped_receiver : public tbb::flow::receiver<T>, NoCopy {
         }
     }
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
+    built_predecessors_type mbp;
+    /*override*/ built_predecessors_type &built_predecessors() { return mbp; }
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
     /*override*/void internal_add_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void internal_delete_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void copy_predecessors(predecessor_list_type &) { }
     /*override*/size_t predecessor_count() { return 0; }
+    /*override*/void clear_predecessors() { my_count = 0; };
     /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { my_count = 0; if(my_map) delete my_map; my_map = new map_type; }
 #else
     /*override*/void reset_receiver() { my_count = 0; if(my_map) delete my_map; my_map = new map_type; }
@@ -410,9 +418,13 @@ struct harness_counting_sender : public tbb::flow::sender<T>, NoCopy {
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
     typedef typename tbb::flow::sender<T>::successor_list_type successor_list_type;
+    typedef typename tbb::flow::sender<T>::built_successors_type built_successors_type;
+    built_successors_type bst;
+    /*override*/ built_successors_type &built_successors() { return bst; }
     /* override */ void internal_add_built_successor( successor_type &) {}
     /* override */ void internal_delete_built_successor( successor_type &) {}
     /* override */ void copy_successors(successor_list_type &) { }
+    /*override*/ void clear_successors() { my_receiver = NULL; }
     /* override */ size_t successor_count() { return 0; }
 #endif
 
@@ -632,7 +644,7 @@ void test_resets() {
             serial_fn_state0 = 0;  // release the function_node.
             g.wait_for_all();  // wait for all the tasks to complete.
         }
-        g.reset(tbb::flow::rf_extract);
+        g.reset(tbb::flow::rf_clear_edges);
         // test that no one is a successor to the buffer now.
         serial_fn_state0 = 1;  // let the function_node go if it gets an input message
         b0.try_put((T)23);

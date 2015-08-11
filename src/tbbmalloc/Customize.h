@@ -117,6 +117,13 @@ inline void SpinWaitWhileEq(const volatile intptr_t &location, const intptr_t va
     tbb::internal::spin_wait_while_eq(location, value);
 }
 
+class AtomicBackoff {
+    tbb::internal::atomic_backoff backoff;
+public:
+    AtomicBackoff() {}
+    void pause() { backoff.pause(); }
+};
+
 inline void SpinWaitUntilEq(const volatile intptr_t &location, const intptr_t value) {
     tbb::internal::spin_wait_until_eq(location, value);
 }

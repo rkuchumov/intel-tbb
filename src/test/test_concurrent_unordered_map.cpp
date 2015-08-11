@@ -42,9 +42,11 @@ bool operator==( tbb::concurrent_unordered_multimap<Key, Value> const& lhs, tbb:
 #include "test_concurrent_unordered_common.h"
 
 typedef tbb::concurrent_unordered_map<int, int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMap;
+typedef tbb::concurrent_unordered_map<int, int, degenerate_hash<int>, std::equal_to<int>, MyAllocator> MyDegenerateMap;
 typedef tbb::concurrent_unordered_map<int, check_type<int>, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyCheckedMap;
-typedef tbb::concurrent_unordered_map<int, FooWithAssign, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyCheckedStateMap;
+typedef tbb::concurrent_unordered_map<intptr_t, FooWithAssign, tbb::tbb_hash<intptr_t>, std::equal_to<intptr_t>, MyAllocator> MyCheckedStateMap;
 typedef tbb::concurrent_unordered_multimap<int, int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMultiMap;
+typedef tbb::concurrent_unordered_multimap<int, int, degenerate_hash<int>, std::equal_to<int>, MyAllocator> MyDegenerateMultiMap;
 typedef tbb::concurrent_unordered_multimap<int, check_type<int>, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyCheckedMultiMap;
 
 template <>
@@ -80,92 +82,91 @@ struct SpecialTests <MyMap> {
     }
 };
 
-template<>
-class AssignBody<MyCheckedMap>: NoAssign{
-    MyCheckedMap &table;
-public:
-    AssignBody( MyCheckedMap &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        table.insert( MyCheckedMap::value_type( i, check_type<int>( i ) ) );
-    }
-};
-
-// for multimap insert (i%3)+1 items  [i,3*i], [i,3*i+1] ..
-template<>
-class AssignBody<MyMultiMap>: NoAssign{
-    MyMultiMap &table;
-public:
-    AssignBody( MyMultiMap &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        for ( int j = 0; j < (i % 3) + 1; ++j ) {
-            table.insert( std::pair<int, int>( i, 3 * i + j - 1 ) );
+void
+check_multimap(MyMultiMap &m, int *targets, int tcount, int key) {
+    std::vector<bool> vfound(tcount,false);
+    std::pair<MyMultiMap::iterator, MyMultiMap::iterator> range = m.equal_range( key );
+    for(MyMultiMap::iterator it = range.first; it != range.second; ++it) {
+        bool found = false;
+        for( int i = 0; i < tcount; ++i) {
+            if((*it).second == targets[i]) {
+                if(!vfound[i])  { // we can insert duplicate values
+                    vfound[i] = found = true;
+                    break;
+                }
+            }
         }
+        // just in case an extra value in equal_range...
+        ASSERT(found, "extra value from equal range");
     }
-};
+    for(int i = 0; i < tcount; ++i) ASSERT(vfound[i], "missing value");
+}
 
-// for multimap insert (i%3)+1 items  [i,3*i], [i,3*i+1] ..
-template<>
-class AssignBody<MyCheckedMultiMap>: NoAssign{
-    MyCheckedMultiMap &table;
-public:
-    AssignBody( MyCheckedMultiMap &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        for ( int j = 0; j < (i % 3) + 1; ++j ) {
-            table.insert( std::pair<int, int>( i, 3 * i + j - 1 ) );
-        }
-    }
-};
-
-// test assumes the unordered multimap puts items in ascending order, and the insertions
-// occur at the end of a range. This assumption may not always be valid.
 template <>
 struct SpecialTests <MyMultiMap> {
-#define VALUE1 7
-#define VALUE2 2
     static void Test( const char *str ) {
+        int one_values[] = { 7, 2, 13, 23, 13 };
+        int zero_values[] = { 4, 9, 13, 29, 42, 111};
+        int n_zero_values = sizeof(zero_values) / sizeof(int);
+        int n_one_values = sizeof(one_values) / sizeof(int);
         MyMultiMap cont( 0 );
         const MyMultiMap &ccont( cont );
         // mapped_type& operator[](const key_type& k);
-        cont.insert( std::make_pair( 1, VALUE1 ) );
+        cont.insert( std::make_pair( 1, one_values[0] ) );
 
         // bool empty() const;    
         ASSERT( !ccont.empty( ), "Concurrent container empty after adding an element" );
 
         // size_type size() const;
         ASSERT( ccont.size( ) == 1, "Concurrent container size incorrect" );
-        ASSERT( (*(cont.begin( ))).second == VALUE1, "Concurrent container value incorrect" );
-        ASSERT( (*(cont.equal_range( 1 )).first).second == VALUE1, "Improper value from equal_range" );
+        ASSERT( (*(cont.begin( ))).second == one_values[0], "Concurrent container value incorrect" );
+        ASSERT( (*(cont.equal_range( 1 )).first).second == one_values[0], "Improper value from equal_range" );
         ASSERT( (cont.equal_range( 1 )).second == cont.end( ), "Improper iterator from equal_range" );
 
-        cont.insert( std::make_pair( 1, VALUE2 ) );
+        cont.insert( std::make_pair( 1, one_values[1] ) );
 
         // bool empty() const;    
         ASSERT( !ccont.empty( ), "Concurrent container empty after adding an element" );
 
         // size_type size() const;
         ASSERT( ccont.size( ) == 2, "Concurrent container size incorrect" );
-        ASSERT( (*(cont.begin( ))).second == VALUE1, "Concurrent container value incorrect" );
-        ASSERT( (*(cont.equal_range( 1 )).first).second == VALUE1, "Improper value from equal_range" );
+        check_multimap(cont, one_values, 2, 1);
+
+        // insert the other {1,x} values
+        for( int i = 2; i < n_one_values; ++i ) {
+            cont.insert( std::make_pair( 1, one_values[i] ) );
+        }
+
+        check_multimap(cont, one_values, n_one_values, 1);
         ASSERT( (cont.equal_range( 1 )).second == cont.end( ), "Improper iterator from equal_range" );
 
-        // check that the second value is part of the range.
-        // though I am not sure there are guarantees what order the insertions appear in the range
-        // if the order differs the ASSERT above will fail already.
-        std::pair<MyMultiMap::iterator, MyMultiMap::iterator> range = cont.equal_range( 1 );
-        MyMultiMap::iterator ii = range.first;
-        ++ii;
-        ASSERT( (*ii).second == VALUE2, "Improper value for second insertion" );
-
-        cont.insert( std::make_pair( 0, 4 ) );
+        cont.insert( std::make_pair( 0, zero_values[0] ) );
 
         // bool empty() const;    
         ASSERT( !ccont.empty( ), "Concurrent container empty after adding an element" );
 
         // size_type size() const;
-        ASSERT( ccont.size( ) == 3, "Concurrent container size incorrect" );
-        ASSERT( (*(cont.begin( ))).second == 4, "Concurrent container value incorrect" );
-        ASSERT( (*(cont.equal_range( 1 )).first).second == VALUE1, "Improper value from equal_range" );
-        ASSERT( (cont.equal_range( 1 )).second == cont.end( ), "Improper iterator from equal_range" );
+        ASSERT( ccont.size( ) == (size_t)(n_one_values+1), "Concurrent container size incorrect" );
+        check_multimap(cont, one_values, n_one_values, 1);
+        check_multimap(cont, zero_values, 1, 0);
+        ASSERT( (*(cont.begin( ))).second == zero_values[0], "Concurrent container value incorrect" );
+        // insert the rest of the zero values
+        for( int i = 1; i < n_zero_values; ++i) {
+            cont.insert( std::make_pair( 0, zero_values[i] ) );
+        }
+        check_multimap(cont, one_values, n_one_values, 1);
+        check_multimap(cont, zero_values, n_zero_values, 0);
+
+        // clear, reinsert interleaved
+        cont.clear();
+        int bigger_num = ( n_one_values > n_zero_values ) ? n_one_values : n_zero_values;
+        for( int i = 0; i < bigger_num; ++i ) {
+            if(i < n_one_values) cont.insert( std::make_pair( 1, one_values[i] ) );
+            if(i < n_zero_values) cont.insert( std::make_pair( 0, zero_values[i] ) );
+        }
+        check_multimap(cont, one_values, n_one_values, 1);
+        check_multimap(cont, zero_values, n_zero_values, 0);
+
 
         REMARK( "passed -- specialized %s tests\n", str );
     }
@@ -290,9 +291,13 @@ int TestMain() {
     test_machine();
 
     test_basic<MyMap>( "concurrent unordered Map" );
+    test_basic<MyDegenerateMap>( "concurrent unordered degenerate Map" );
     test_concurrent<MyMap>( "concurrent unordered Map" );
+    test_concurrent<MyDegenerateMap>( "concurrent unordered degenerate Map" );
     test_basic<MyMultiMap>( "concurrent unordered MultiMap" );
+    test_basic<MyDegenerateMultiMap>( "concurrent unordered degenerate MultiMap" );
     test_concurrent<MyMultiMap>( "concurrent unordered MultiMap" );
+    test_concurrent<MyDegenerateMultiMap>( "concurrent unordered degenerate MultiMap" );
     test_concurrent<MyMultiMap>( "concurrent unordered MultiMap asymptotic", true );
 
     { Check<MyCheckedMap::value_type> checkit; test_basic<MyCheckedMap>( "concurrent unordered map (checked)" ); }

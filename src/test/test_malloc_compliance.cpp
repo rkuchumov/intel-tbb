@@ -519,48 +519,40 @@ inline size_t choose_random_alignment() {
 
 void CMemTest::InvariantDataRealloc(bool aligned)
 {
-    size_t size, sizeMin;
-    CountErrors=0;
-    if (FullLog) REPORT("\nInvariant data by realloc....");
-    UCHAR* pchar;
-    sizeMin=size=rand()%MAX_SIZE+10;
-    pchar = aligned?
-        (UCHAR*)Taligned_realloc(NULL,size,choose_random_alignment())
-        : (UCHAR*)Trealloc(NULL,size);
-    if (NULL == pchar)
-        return;
-    for (size_t k=0; k<size; k++)
-        pchar[k]=(UCHAR)k%255+1;
-    for (int i=0; i<COUNTEXPERIMENT; i++)
-    {
-        size=rand()%MAX_SIZE+10;
-        UCHAR *pcharNew = aligned?
-            (UCHAR*)Taligned_realloc(pchar,size, choose_random_alignment())
-            : (UCHAR*)Trealloc(pchar,size);
-        if (NULL == pcharNew)
-            continue;
-        pchar = pcharNew;
-        sizeMin=size<sizeMin ? size : sizeMin;
-        for (size_t k=0; k<sizeMin; k++)
-            if (pchar[k] != (UCHAR)k%255+1)
-            {
-                CountErrors++;
-                if (ShouldReportError())
-                {
-                    REPORT("stand '%c', must stand '%c'\n",pchar[k],(UCHAR)k%255+1);
-                    REPORT("error: data changed (at %llu, SizeMin=%llu)\n",
-                           (long long unsigned)k,(long long unsigned)sizeMin);
-                }
-            }
+    const size_t MAX_ALLOC = 8*MByte;
+    Harness::FastRandom fastRandom(1);
+    size_t size = 0, start = 0;
+    char *ptr = NULL,
+        // master to create copies and compare ralloc result against it
+        *master = (char*)Tmalloc(2*MAX_ALLOC);
+
+    ASSERT(master, NULL);
+    __TBB_STATIC_ASSERT(!(2*MAX_ALLOC%sizeof(unsigned short)),
+                        "The loop below expects that 2*MAX_ALLOC contains sizeof(unsigned short)");
+    for (size_t k = 0; k<2*MAX_ALLOC; k+=sizeof(unsigned short))
+        *(unsigned short*)(master+k) = fastRandom.get();
+
+    for (int i=0; i<100; i++) {
+        // don't want sizeNew==0 here
+        const size_t sizeNew = rand() % (MAX_ALLOC-1) + 1;
+        char *ptrNew = aligned?
+            (char*)Taligned_realloc(ptr, sizeNew, choose_random_alignment())
+            : (char*)Trealloc(ptr, sizeNew);
+        ASSERT(ptrNew, NULL);
+        // check that old data not changed
+        ASSERT(!memcmp(ptrNew, master+start, min(size, sizeNew)), "broken data");
+
+        // prepare fresh data, copying them from random position in master
+        size = sizeNew;
+        ptr = ptrNew;
+        start = rand() % MAX_ALLOC;
+        memcpy(ptr, master+start, size);
     }
     if (aligned)
-        Taligned_realloc(pchar,0,choose_random_alignment());
+        Taligned_realloc(ptr, 0, choose_random_alignment());
     else
-        Trealloc(pchar,0);
-    if (CountErrors) REPORT("%s\n",strError);
-    else if (FullLog) REPORT("%s\n",strOk);
-    error_occurred |= ( CountErrors>0 ) ;
-    //REPORT("end check\n");
+        Trealloc(ptr, 0);
+    Tfree(master);
 }
 
 struct PtrSize {
@@ -605,7 +597,7 @@ void CMemTest::AddrArifm()
         if (NULL!=tmpAddr) {
             arr[i].ptr = tmpAddr;
             arr[i].size = count;
-        } else if (count==0) { // becasue realloc(..., 0) works as free
+        } else if (count==0) { // because realloc(..., 0) works as free
             arr[i].ptr = NULL;
             arr[i].size = 0;
         }
@@ -774,7 +766,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
                 // Technically, if malloc returns a non-NULL pointer, it is allowed to set errno anyway.
                 // However, on most systems it does not set errno.
                 bool known_issue = false;
-#if __linux__
+#if __linux__ || __ANDROID__
                 if( CHECK_ERRNO(errno==ENOMEM) ) known_issue = true;
 #endif /* __linux__ */
                 if ( CHECK_ERRNO(errno != ENOMEM+j+1) && !known_issue) {
@@ -836,19 +828,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
             {
                 errno = 0;
                 tmp=Trealloc(PointerList[i].Pointer,PointerList[i].Size*2);
-                if (PointerList[i].Pointer == tmp) // the same place
-                {
-                    bool known_issue = false;
-#if __linux__
-                    if( errno==ENOMEM ) known_issue = true;
-#endif /* __linux__ */
-                    if (errno != 0 && !known_issue) {
-                        CountErrors++;
-                        if (ShouldReportError()) REPORT("valid pointer returned, error: errno not kept\n");
-                    }
-                    PointerList[i].Size *= 2;
-                }
-                else if (tmp != PointerList[i].Pointer && tmp != NULL) // another place
+                if (tmp != NULL) // same or another place
                 {
                     bool known_issue = false;
 #if __linux__
@@ -862,9 +842,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
                     myMemset((char*)tmp + PointerList[i].Size, 0, PointerList[i].Size);
                     PointerList[i].Pointer = tmp;
                     PointerList[i].Size *= 2;
-                }
-                else if (tmp == NULL)
-                {
+                } else {
                     CountNULL++;
                     if ( CHECK_ERRNO(errno != ENOMEM) )
                     {
@@ -892,7 +870,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
     else
         limitMem(0);
 }
-#endif /* #if __APPLE__ */
+#endif /* #if !__APPLE__ */
 
 void CMemTest::UniquePointer()
 {

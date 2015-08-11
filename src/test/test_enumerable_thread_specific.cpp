@@ -491,7 +491,7 @@ void run_parallel_scalar_tests(const char *test_name, const char *allocator_name
     T exemplar;
     test_helper<T>::init(exemplar);
 
-    size_t test_throw_count = 10;
+    int test_throw_count = 10;
     // the test will be performed repeatedly until it does not throw.  For non-throwing types
     // this means once; for the throwing type test it may loop two or three times.  The
     // value of targetThrowValue will determine when and if the test will throw.

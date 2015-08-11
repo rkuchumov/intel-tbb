@@ -62,11 +62,15 @@ public:
     }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
+    built_predecessors_type mbp;
+    /*override*/ built_predecessors_type &built_predecessors() { return mbp; }
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
     /*override*/void internal_add_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void internal_delete_built_predecessor(tbb::flow::sender<T> &) {}
     /*override*/void copy_predecessors(predecessor_list_type &) {}
     /*override*/size_t predecessor_count() { return 0; }
+    /*override*/void clear_predecessors() { }
     /*override*/void reset_receiver(tbb::flow::reset_flags /*f*/) { }
 #else
     /*override*/void reset_receiver() { }
@@ -203,7 +207,7 @@ void test_resets() {
         if (testNo == 0) g.reset();
     }
 
-    g.reset(tbb::flow::rf_extract);
+    g.reset(tbb::flow::rf_clear_edges);
     for(T i= 0; i <= 3; i += 1) {
         b0.try_put(i);
     }

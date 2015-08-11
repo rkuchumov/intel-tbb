@@ -18,6 +18,7 @@
     reasons why the executable file might be covered by the GNU General Public License.
 */
 
+// have to expose the reset_node method to be able to reset a function_body
 #include "harness.h"
 #include "harness_graph.h"
 #include "tbb/flow_graph.h"
@@ -46,7 +47,10 @@ public:
     typedef tbb::flow::sender<T> predecessor_type;
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
+    built_predecessors_type bpt;
+    built_predecessors_type &built_predecessors() { return bpt; }
     void internal_add_built_predecessor( predecessor_type & ) { }
     void internal_delete_built_predecessor( predecessor_type & ) { }
     void copy_predecessors( predecessor_list_type & ) { }
@@ -193,7 +197,7 @@ void test_extract() {
     s0.activate();
     g.wait_for_all();  // no successors, so the body will not execute
     ASSERT(counts == 0, "source_node shouldn't forward (no successors)");
-    s0.extract(tbb::flow::rf_reset_bodies);
+    g.reset(tbb::flow::rf_reset_bodies);
 
     tbb::flow::make_edge(s0, tbb::flow::get<0>(j0.input_ports()));
     tbb::flow::make_edge(s0, tbb::flow::get<0>(j1.input_ports()));

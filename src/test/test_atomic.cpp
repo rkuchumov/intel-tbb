@@ -1052,7 +1052,7 @@ int TestMain () {
 #   elif __TBB_CAS_8_CODEGEN_BROKEN
          REPORT("Known issue: compiler generates incorrect code for 64-bit atomics on this configuration\n");
 #   else
-         REPORT("64-bit atomics not supported\n");
+         REPORT("Known issue: 64-bit atomics are not supported\n");
          ASSERT(sizeof(long long)==8, "type long long is not 64 bits");
 #   endif
     TestAtomicInteger<unsigned long>("unsigned long");

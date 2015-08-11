@@ -40,9 +40,13 @@ struct fake_continue_sender : public tbb::flow::sender<tbb::flow::continue_msg>
     /*override*/ bool register_successor( successor_type& ) { return false; }
     /*override*/ bool remove_successor( successor_type& )   { return false; }  
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef tbb::flow::sender<tbb::flow::continue_msg>::built_successors_type built_successors_type;
+    built_successors_type bst;
+    /*override*/ built_successors_type &built_successors() { return bst; }
     /*override*/void internal_add_built_successor( successor_type &) { }
     /*override*/void internal_delete_built_successor( successor_type &) { }
     /*override*/void copy_successors(successor_list_type &) {}
+    /*override*/void clear_successors() {}
     /*override*/size_t successor_count() {return 0;}
 #endif
 };

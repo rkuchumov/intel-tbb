@@ -26,6 +26,7 @@ PIC_KEY = -fPIC
 WARNING_AS_ERROR_KEY = -Werror
 WARNING_KEY = -Wall
 DYLIB_KEY = -shared
+WARNING_SUPPRESS = -Wno-parentheses
 
 CPLUS = g++ 
 CONLY = gcc

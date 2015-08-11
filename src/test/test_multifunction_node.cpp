@@ -586,12 +586,12 @@ void test_extract() {
         ASSERT(my_count == 4, "multifunction_node didn't fire though it has one predecessor");
         ASSERT(!q0.try_get(cm), "multifunction_node forwarded");
         ASSERT(q1.try_get(cm), "multifunction_node forwarded");
+        mf0.extract();
     
         if(i == 0) {
-            mf0.extract();
         }
         else {
-            mf0.extract(tbb::flow::rf_reset_bodies);
+            g.reset(tbb::flow::rf_reset_bodies);
         }
     
     
