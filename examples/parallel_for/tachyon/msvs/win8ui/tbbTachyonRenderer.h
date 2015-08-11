@@ -43,3 +43,4 @@ private:
     DWRITE_TEXT_METRICS m_textMetrics;
     bool m_renderNeeded;
     ~tbbTachyonRenderer();
+};

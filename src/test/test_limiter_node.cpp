@@ -41,7 +41,10 @@ struct serial_receiver : public tbb::flow::receiver<T> {
    }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
+    built_predecessors_type bpt;
+    built_predecessors_type &built_predecessors() { return bpt; }
     void internal_add_built_predecessor( tbb::flow::sender<T> & ) { }
     void internal_delete_built_predecessor( tbb::flow::sender<T> & ) { }
     void copy_predecessors( predecessor_list_type & ) { }
@@ -68,7 +71,10 @@ struct parallel_receiver : public tbb::flow::receiver<T> {
    }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+    typedef typename tbb::flow::receiver<T>::built_predecessors_type built_predecessors_type;
     typedef typename tbb::flow::receiver<T>::predecessor_list_type predecessor_list_type;
+    built_predecessors_type bpt;
+    built_predecessors_type &built_predecessors() { return bpt; }
     void internal_add_built_predecessor( tbb::flow::sender<T> & ) { }
     void internal_delete_built_predecessor( tbb::flow::sender<T> & ) { }
     void copy_predecessors( predecessor_list_type & ) { }
@@ -84,7 +90,10 @@ struct empty_sender : public tbb::flow::sender<T> {
         /* override */ bool register_successor( tbb::flow::receiver<T> & ) { return false; }
         /* override */ bool remove_successor( tbb::flow::receiver<T> & ) { return false; }
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
+        typedef typename tbb::flow::sender<T>::built_successors_type built_successors_type;
         typedef typename tbb::flow::sender<T>::successor_list_type successor_list_type;
+        built_successors_type bst;
+        built_successors_type &built_successors() { return bst; }
         void    internal_add_built_successor( tbb::flow::receiver<T> & ) { }
         void internal_delete_built_successor( tbb::flow::receiver<T> & ) { }
         void copy_successors( successor_list_type & ) { }
@@ -411,7 +420,7 @@ void test_extract() {
     tbb::flow::broadcast_node<tbb::flow::continue_msg> b1(g);
 
     for( int i = 0; i < 2; ++i ) {
-
+        REMARK("At pass %d\n", i);
         ASSERT(node0.predecessor_count() == 0, "incorrect predecessor count at start");
         ASSERT(node0.successor_count() == 0, "incorrect successor count at start");
         ASSERT(node0.decrement.predecessor_count() == 0, "incorrect decrement pred count at start");
@@ -436,7 +445,8 @@ void test_extract() {
         ASSERT(node0.predecessor_count() == 2, "incorrect predecessor count after construction");
         ASSERT(node0.successor_count() == 1, "incorrect successor count after construction");
         ASSERT(node0.decrement.predecessor_count() == 2, "incorrect decrement pred count after construction");
-        ASSERT(q2.try_get(j) && j == i, "improper value forwarded to output queue");
+        ASSERT(q2.try_get(j), "fetch of value forwarded to output queue failed");
+        ASSERT(j == i, "improper value forwarded to output queue");
         q0.try_put(2*i);
         g.wait_for_all();
         ASSERT(!q2.try_get(j), "limiter_node forwarded item improperly");
@@ -471,6 +481,9 @@ void test_extract() {
 
         if(i == 0) {
             node0.extract();
+            ASSERT(node0.predecessor_count() == 0, "incorrect predecessor count after extraction");
+            ASSERT(node0.successor_count() == 0, "incorrect successor count after extraction");
+            ASSERT(node0.decrement.predecessor_count() == 0, "incorrect decrement pred count after extraction");
         }
         else {
             q0.extract();

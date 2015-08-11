@@ -53,58 +53,12 @@ bool operator==(tbb::concurrent_unordered_multiset<T> const& lhs, tbb::concurren
 #include "test_concurrent_unordered_common.h"
 
 typedef tbb::concurrent_unordered_set<int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MySet;
+typedef tbb::concurrent_unordered_set<int, degenerate_hash<int>, std::equal_to<int>, MyAllocator> MyDegenerateSet;
 typedef tbb::concurrent_unordered_set<check_type<int>, tbb::tbb_hash<check_type<int> >, std::equal_to<check_type<int> >, MyAllocator> MyCheckedSet;
 typedef tbb::concurrent_unordered_set<FooWithAssign, tbb::tbb_hash<Foo>, std::equal_to<FooWithAssign>, MyAllocator> MyCheckedStateSet;
 typedef tbb::concurrent_unordered_multiset<int, tbb::tbb_hash<int>, std::equal_to<int>, MyAllocator> MyMultiSet;
+typedef tbb::concurrent_unordered_multiset<int, degenerate_hash<int>, std::equal_to<int>, MyAllocator> MyDegenerateMultiSet;
 typedef tbb::concurrent_unordered_multiset<check_type<int>, tbb::tbb_hash<check_type<int> >, std::equal_to<check_type<int> >, MyAllocator> MyCheckedMultiSet;
-
-template<>
-class AssignBody<MySet>: NoAssign{
-    MySet &table;
-public:
-    AssignBody( MySet &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        table.insert( i );
-    }
-};
-
-template<>
-class AssignBody<MyCheckedSet>: NoAssign{
-    MyCheckedSet &table;
-public:
-    AssignBody( MyCheckedSet &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        table.insert( check_type<int>( i ) );
-    }
-};
-
-// multiset: for i, inserts i i%3+1 times
-template<>
-class AssignBody<MyMultiSet>: NoAssign{
-    MyMultiSet &table;
-public:
-    AssignBody( MyMultiSet &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        int num = i % 3 + 1;
-        for ( int j = 0; j < num; ++j ) {
-            table.insert( i );
-        }
-    }
-};
-
-// multiset: for i, inserts i i%3+1 times
-template<>
-class AssignBody<MyCheckedMultiSet>: NoAssign{
-    MyCheckedMultiSet &table;
-public:
-    AssignBody( MyCheckedMultiSet &t ) : NoAssign( ), table( t ) {}
-    void operator()( int i ) const {
-        int num = i % 3 + 1;
-        for ( int j = 0; j < num; ++j ) {
-            table.insert( i );
-        }
-    }
-};
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
 struct cu_set_type : unordered_move_traits_base {
@@ -198,9 +152,13 @@ int TestMain() {
     test_machine( );
 
     test_basic<MySet>( "concurrent unordered Set" );
+    test_basic<MyDegenerateSet>( "concurrent unordered degenerate Set" );
     test_concurrent<MySet>("concurrent unordered Set");
+    test_concurrent<MyDegenerateSet>( "concurrent unordered degenerate Set" );
     test_basic<MyMultiSet>("concurrent unordered MultiSet");
+    test_basic<MyDegenerateMultiSet>("concurrent unordered degenerate MultiSet");
     test_concurrent<MyMultiSet>( "concurrent unordered MultiSet" );
+    test_concurrent<MyDegenerateMultiSet>("concurrent unordered degenerate MultiSet");
     test_concurrent<MyMultiSet>( "concurrent unordered MultiSet asymptotic", true );
 
     { Check<MyCheckedSet::value_type> checkit; test_basic<MyCheckedSet>( "concurrent_unordered_set (checked)" ); }

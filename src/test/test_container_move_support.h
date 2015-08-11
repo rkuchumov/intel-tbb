@@ -27,6 +27,8 @@
 #include "tbb/atomic.h"
 #include "tbb/aligned_space.h"
 #include <stdexcept>
+#include <string>
+#include <functional>
 
 #if __TBB_NOEXCEPT_PRESENT
 #define __TBB_NOTHROW __TBB_NOEXCEPT(true)

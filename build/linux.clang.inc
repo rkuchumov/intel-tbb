@@ -35,7 +35,7 @@ CPLUS = clang++
 CONLY = clang
 LIB_LINK_FLAGS = $(DYLIB_KEY) -Wl,-soname=$(BUILDING_LIBRARY)
 LIBS += -lpthread -lrt
-LINK_FLAGS = -Wl,-rpath-link=.
+LINK_FLAGS = -Wl,-rpath-link=. -rdynamic
 C_FLAGS = $(CPLUS_FLAGS)
 
 ifeq ($(cfg), release)

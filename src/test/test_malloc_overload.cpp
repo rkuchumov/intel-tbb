@@ -34,11 +34,8 @@
 #endif // _WIN32 || _WIN64
 
 #define HARNESS_NO_PARSE_COMMAND_LINE 1
-// LD_PRELOAD mechanism is broken in offload
-#if __TBB_MIC_OFFLOAD
-#define HARNESS_SKIP_TEST 1
-#endif
-#include "harness.h"
+
+#include "tbb/tbb_config.h" // to get __TBB_WIN8UI_SUPPORT
 
 #if __linux__ || __APPLE__
 #define MALLOC_REPLACEMENT_AVAILABLE 1
@@ -46,6 +43,12 @@
 #define MALLOC_REPLACEMENT_AVAILABLE 2
 #include "tbb/tbbmalloc_proxy.h"
 #endif
+
+// LD_PRELOAD mechanism is broken in offload, no support for MSVC 2015 in debug for now
+#if __TBB_MIC_OFFLOAD || !MALLOC_REPLACEMENT_AVAILABLE || (_MSC_VER >= 1900 && _DEBUG)
+#define HARNESS_SKIP_TEST 1
+#endif
+#include "harness.h"
 
 #if MALLOC_REPLACEMENT_AVAILABLE
 
@@ -416,11 +419,4 @@ int TestMain() {
 
     return Harness::Done;
 }
-
-#else  /* !MALLOC_REPLACEMENT_AVAILABLE */
-#include <stdio.h>
-
-int TestMain() {
-    return Harness::Skipped;
-}
-#endif /* !MALLOC_REPLACEMENT_AVAILABLE */
+#endif /* MALLOC_REPLACEMENT_AVAILABLE */

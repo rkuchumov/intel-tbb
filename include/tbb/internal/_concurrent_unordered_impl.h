@@ -1290,7 +1290,7 @@ private:
         sokey_t order_key = (sokey_t) my_hash_compare(get_key(value));
         size_type bucket = order_key % my_number_of_buckets;
 
-        //TODO:refactor the get_bucket related staff into separate function something like aqcuire_bucket(key_type)
+        //TODO:refactor the get_bucket related stuff into separate function something like acquire_bucket(key_type)
         // If bucket is empty, initialize it first
         if (!is_initialized(bucket))
             init_bucket(bucket);
@@ -1308,12 +1308,15 @@ private:
 
         for (;;)
         {
-            if (where == last || solist_t::get_order_key(where) > order_key)
+            if (where == last || solist_t::get_order_key(where) > order_key ||
+                    // if multimapped, stop at the first item equal to us.
+                    (allow_multimapping && solist_t::get_order_key(where) == order_key &&
+                     !my_hash_compare(get_key(*where), get_key(value))))
             {
                  if (!pnode)
                      pnode = my_solist.create_node(order_key, tbb::internal::forward<ValueType>(value));
             
-                // Try to insert it in the right place
+                // Try to insert 'pnode' between 'it' and 'where'
                 std::pair<iterator, bool> result = my_solist.try_insert(it, where, pnode, &new_count);
                 
                 if (result.second)
@@ -1334,14 +1337,13 @@ private:
                     continue;
                 }
             }
-            else if (!allow_multimapping && solist_t::get_order_key(where) == order_key && my_hash_compare(get_key(*where), get_key(value)) == 0)
-            {
+            else if (!allow_multimapping && solist_t::get_order_key(where) == order_key &&
+                    my_hash_compare(get_key(*where), get_key(value)) == 0)
+            { // Element already in the list, return it
                  if (pnode)
                      my_solist.destroy_node(pnode);            
-                // Element already in the list, return it
                 return std::pair<iterator, bool>(my_solist.get_iterator(where), false);
             }
-
             // Move the iterator forward
             it = where;
             ++where;

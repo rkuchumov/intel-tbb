@@ -60,6 +60,15 @@ inline size_t arrayLength(const T(&)[N]) {
     return N;
 }
 
+#if defined(min)
+#undef min
+#endif
+
+template<typename T>
+T min ( const T& val1, const T& val2 ) {
+    return val1 < val2 ? val1 : val2;
+}
+
 namespace rml {
 namespace internal {
 

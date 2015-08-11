@@ -29,6 +29,13 @@
 #undef  __HARNESS_CHECKTYPE_DEFAULT_CTOR
 #include "harness_allocator.h"
 
+template<typename T>
+struct degenerate_hash {
+    size_t operator()(const T& /*a*/) const {
+        return 1;
+    }
+};
+
 // TestInitListSupportWithoutAssign with an empty initializer list causes internal error in Intel Compiler.
 #define __TBB_ICC_EMPTY_INIT_LIST_TESTS_BROKEN (__INTEL_COMPILER && __INTEL_COMPILER <= 1500)
 
@@ -62,7 +69,7 @@ struct ValueFactory {
     typedef typename strip_const<K>::type Kstrip;
     static V make(const K &value) { return V(value, value); }
     static Kstrip key(const V &value) { return value.first; }
-    static Kstrip get(const V& value) { return value.second; }
+    static Kstrip get(const V &value) { return (Kstrip)value.second; }
 };
 
 // generator for cuset
@@ -420,24 +427,16 @@ void test_basic(const char * str, do_check_element_state)
         ASSERT(buck < 16, "Wrong bucket mapping");
     }
 
+    typename T::size_type bucketSizeSum = 0;
+    typename T::size_type iteratorSizeSum = 0;
+
     for (unsigned int i = 0; i < 16; i++)
     {
-        // size_type unsafe_bucket_size(size_type n);
-        ASSERT(cont.unsafe_bucket_size(i) == 16, "Wrong number of elements are in a bucket");
-
-        // local_iterator unsafe_begin(size_type n);
-        // const_local_iterator unsafe_begin(size_type n) const;
-        // local_iterator unsafe_end(size_type n);
-        // const_local_iterator unsafe_end(size_type n) const;
-        // const_local_iterator unsafe_cbegin(size_type n) const;
-        // const_local_iterator unsafe_cend(size_type n) const;
-        unsigned int count = 0;
-        for (typename T::iterator bit = cont.unsafe_begin(i); bit != cont.unsafe_end(i); bit++)
-        {
-            count++;
-        }
-        ASSERT(count == 16, "Bucket iterators are invalid");
+        bucketSizeSum += cont.unsafe_bucket_size(i);
+        for (typename T::iterator bit = cont.unsafe_begin(i); bit != cont.unsafe_end(i); bit++) iteratorSizeSum++;
     }
+    ASSERT(bucketSizeSum == 256, "sum of bucket counts incorrect");
+    ASSERT(iteratorSizeSum == 256, "sum of iterator counts incorrect");
 
     // void swap(T&);
     cont.swap(newcont);
@@ -595,16 +594,6 @@ public:
 };
 
 template<typename T>
-class AssignBody: NoAssign {
-    T &table;
-public:
-    AssignBody(T &t) : NoAssign(), table(t) {}
-    void operator()(int i) const {
-        table[i] = i;
-    }
-};
-
-template<typename T>
 void test_concurrent(const char *tablename, bool asymptotic = false) {
 #if TBB_USE_ASSERT
     int items = 2000;
@@ -659,10 +648,6 @@ void test_concurrent(const char *tablename, bool asymptotic = false) {
     table.clear();
     CheckAllocatorA(table, items+1, items); // one dummy is always allocated
 
-    for(int i=0; i<1000; ++i) {
-        tbb::parallel_for( 0, 8, AssignBody<T>( table ) );
-        table.clear();
-    }
 }
 
 // The helper to call a function only when a doCall == true.
