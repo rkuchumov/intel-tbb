@@ -54,6 +54,11 @@ test: tbb tbbmalloc $(if $(use_proxy),tbbproxy)
 	-$(MAKE) -C "$(work_dir)_release"  -r -f $(tbb_root)/build/Makefile.tbbmalloc cfg=release malloc_test
 	-$(MAKE) -C "$(work_dir)_release"  -r -f $(tbb_root)/build/Makefile.test cfg=release
 
+stest: tbb tbbmalloc $(if $(use_proxy),tbbproxy)
+	if [[ -z "$(stest)" ]]; then echo "You must provide a single test to execute on stest variable."; exit 1; fi
+	-$(MAKE) -C "$(work_dir)_debug"   -r -f $(tbb_root)/build/Makefile.test cfg=debug stest=$(stest)
+	-$(MAKE) -C "$(work_dir)_release" -r -f $(tbb_root)/build/Makefile.test cfg=release stest=$(stest)
+
 rml: mkdir
 	$(MAKE) -C "$(work_dir)_debug"  -r -f $(tbb_root)/build/Makefile.rml cfg=debug
 	$(MAKE) -C "$(work_dir)_release"  -r -f $(tbb_root)/build/Makefile.rml cfg=release
