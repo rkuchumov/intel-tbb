@@ -106,7 +106,7 @@ template<typename T, LoadStoreExpression E> tbb::atomic<T> TestStruct<T, E>::gCo
 //! Test compare_and_swap template members of class atomic<T> for memory_semantics=M
 template<typename T,tbb::memory_semantics M>
 void TestCompareAndSwapWithExplicitOrdering( T i, T j, T k ) {
-    ASSERT( i!=k, "values must be distinct" ); 
+    ASSERT( i!=k, "values must be distinct" );
     // Test compare_and_swap that should fail
     TestStruct<T> x(i);
     T old = x.counter.template compare_and_swap<M>( j, k );
@@ -997,28 +997,43 @@ void TestBitOperations(){
 
 int TestMain () {
 #   if __TBB_ATOMIC_CTORS
+         REPORT("Testing TestConstExprInitializationOfGlobalObjects...\n");
          TestConstExprInitializationOfGlobalObjects();
 #   endif //__TBB_ATOMIC_CTORS
 #   if __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN
+         REPORT("Testing Atomic Integer <unsigned long long> - __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN...\n");
          TestAtomicInteger<unsigned long long>("unsigned long long");
+         REPORT("Testing Atomic Integer <long long> - __TBB_64BIT_ATOMICS && !__TBB_CAS_8_CODEGEN_BROKEN...\n");
          TestAtomicInteger<long long>("long long");
 #   elif __TBB_CAS_8_CODEGEN_BROKEN
-         REPORT("Known issue: compiler generates incorrect code for 64-bit atomics on this configuration\n");
+         REPORT("Known issue: compiler generates incorrect code for 64-bit atomics on this configuration!\n");
 #   else
          REPORT("64-bit atomics not supported\n");
          ASSERT(sizeof(long long)==8, "type long long is not 64 bits");
 #   endif
+    REPORT("Testing Atomic Integer <unsigned long>...\n");
     TestAtomicInteger<unsigned long>("unsigned long");
+    REPORT("Testing Atomic Integer <long>...\n");
     TestAtomicInteger<long>("long");
+    REPORT("Testing Atomic Integer <unsigned int>...\n");
     TestAtomicInteger<unsigned int>("unsigned int");
+    REPORT("Testing Atomic Integer <int>...\n");
     TestAtomicInteger<int>("int");
+    REPORT("Testing Atomic Integer <unsigned short>...\n");
     TestAtomicInteger<unsigned short>("unsigned short");
+    REPORT("Testing Atomic Integer <short>...\n");
     TestAtomicInteger<short>("short");
+    REPORT("Testing Atomic Integer <signed char>...\n");
     TestAtomicInteger<signed char>("signed char");
+    REPORT("Testing Atomic Integer <unsigned char>...\n");
     TestAtomicInteger<unsigned char>("unsigned char");
+    REPORT("Testing Atomic Integer <char>...\n");
     TestAtomicInteger<char>("char");
+    REPORT("Testing Atomic Integer <wchar_t>...\n");
     TestAtomicInteger<wchar_t>("wchar_t");
+    REPORT("Testing Atomic Integer <size_t>...\n");
     TestAtomicInteger<size_t>("size_t");
+    REPORT("Testing Atomic Integer <ptrdiff_t>...\n");
     TestAtomicInteger<ptrdiff_t>("ptrdiff_t");
     TestAtomicPointer<ArrayElement<1> >();
     TestAtomicPointer<ArrayElement<2> >();
@@ -1222,7 +1237,7 @@ public:
                     if( flag!=(T)-1 ) {
                         REPORT("ERROR: flag!=(T)-1 k=%d i=%d trial=%x type=%s (atomicity problem?)\n", k, i, trial, name );
                         ParallelError = true;
-                    } 
+                    }
                     if( !IsRelaxed(E) && message!=(T)-1 ) {
                         REPORT("ERROR: message!=(T)-1 k=%d i=%d trial=%x type=%s mode=%d (memory fence problem?)\n", k, i, trial, name, E );
                         ParallelError = true;
