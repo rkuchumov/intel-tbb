@@ -25,6 +25,7 @@
 #include "scheduler_common.h"
 #include "governor.h"
 #include "tbb_misc.h"
+#include "my_stat.h"
 
 using rml::internal::thread_monitor;
 
@@ -225,6 +226,7 @@ __RML_DECL_THREAD_ROUTINE private_worker::thread_routine( void* arg ) {
     int HWThreadIndex = __TBB_XBOX360_GetHardwareThreadIndex(i);
     XSetThreadProcessor(GetCurrentThread(), HWThreadIndex);
 #endif
+    init_thread_stat2();
     self->run();
     return 0;
 }
@@ -396,7 +398,7 @@ void private_server::wake_some( int additional_slack ) {
         }
     }
 done:
-    while( w>wakee ) 
+    while( w>wakee )
         (*--w)->wake_or_launch();
 }
 

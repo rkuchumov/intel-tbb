@@ -18,6 +18,8 @@
     reasons why the executable file might be covered by the GNU General Public License.
 */
 
+#include <iostream>
+
 #include "custom_scheduler.h"
 #include "scheduler_utility.h"
 #include "governor.h"
@@ -25,6 +27,7 @@
 #include "arena.h"
 #include "mailbox.h"
 #include "observer_proxy.h"
+#include "my_stat.h"
 #include "tbb/tbb_machine.h"
 #include "tbb/atomic.h"
 
@@ -35,6 +38,7 @@ namespace internal {
 // Library initialization
 //------------------------------------------------------------------------
 
+size_t generic_scheduler::min_task_pool_size = 64;
 /** Defined in tbb_main.cpp **/
 extern generic_scheduler* (*AllocateSchedulerPtr)( arena*, size_t index );
 
@@ -434,6 +438,7 @@ size_t generic_scheduler::prepare_task_pool ( size_t num_tasks ) {
     if( !my_arena_slot->my_task_pool_size ) {
         __TBB_ASSERT( !in_arena() && !my_arena_slot->task_pool_ptr, NULL );
         if( new_size < min_task_pool_size ) new_size = min_task_pool_size;
+
         my_arena_slot->allocate_task_pool( new_size );
     }
     // If the free space at the beginning of the task pool is too short, we
@@ -457,6 +462,8 @@ size_t generic_scheduler::prepare_task_pool ( size_t num_tasks ) {
         commit_relocated_tasks(T);
         __TBB_ASSERT( old_pool, "attempt to free NULL TaskPool" );
         NFS_Free( old_pool );
+        std::cerr << "warning: task pool was resized to " <<
+            my_arena_slot->my_task_pool_size << " size\n";
     }
     assert_task_pool_valid();
     return T;
@@ -620,8 +627,11 @@ void generic_scheduler::local_spawn( task& first, task*& next ) {
         // may affect the binary compatibility, we postpone them for a while.
 #endif
         size_t T = prepare_task_pool( 1 );
-        my_arena_slot->task_pool_ptr[T] = prepare_for_spawning( &first );
+        task *t = prepare_for_spawning( &first );
+        gather_stat(STAT_PUSH);
+        my_arena_slot->task_pool_ptr[T] = t;
         commit_spawned_tasks( T + 1 );
+        gather_stat(STAT_NOOP);
     }
     else {
         // Task list is being spawned
@@ -653,6 +663,7 @@ void generic_scheduler::local_spawn( task& first, task*& next ) {
         tasks.copy_memory( my_arena_slot->task_pool_ptr + T );
         commit_spawned_tasks( T + num_tasks );
     }
+
     if ( !in_arena() )
         enter_arena();
     my_arena->advertise_new_work</*Spawned=*/true>();
@@ -895,7 +906,9 @@ retry:
         size_t H = __TBB_load_relaxed(my_arena_slot->head); // mirror
         if ( (intptr_t)H <= (intptr_t)T ) {
             // The thief backed off - grab the task
+            gather_stat(STAT_POP);
             result = my_arena_slot->task_pool_ptr[T];
+            gather_stat(STAT_NOOP);
             __TBB_ASSERT( !is_poisoned(result), NULL );
             poison_pointer( my_arena_slot->task_pool_ptr[T] );
         }
@@ -911,7 +924,9 @@ retry:
     }
     else {
         __TBB_control_consistency_helper(); // on my_arena_slot->head
+        gather_stat(STAT_POP);
         result = my_arena_slot->task_pool_ptr[T];
+        gather_stat(STAT_NOOP);
         __TBB_ASSERT( !is_poisoned(result), NULL );
         poison_pointer( my_arena_slot->task_pool_ptr[T] );
     }
@@ -933,6 +948,7 @@ retry:
         my_innermost_running_task = result;
         result->note_affinity(my_affinity_id);
     }
+
     __TBB_ASSERT( result || is_quiescent_local_task_pool_reset(), NULL );
     return result;
 } // generic_scheduler::get_task
@@ -957,7 +973,9 @@ retry:
     }
     else {
         __TBB_control_consistency_helper(); // on victim_slot.tail
+        gather_stat(STAT_STEAL);
         result = victim_pool[H-1];
+        gather_stat(STAT_NOOP);
         __TBB_ASSERT( !is_poisoned(result), NULL );
         if( is_proxy(*result) ) {
             task_proxy& tp = *static_cast<task_proxy*>(result);

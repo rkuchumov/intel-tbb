@@ -252,7 +252,7 @@ public: // almost every class in TBB uses generic_scheduler
 
     /** Initial size of the task deque sufficient to serve without reallocation
         4 nested parallel_for calls with iteration space of 65535 grains each. **/
-    static const size_t min_task_pool_size = 64;
+    static size_t min_task_pool_size;
 
     //! Makes sure that the task pool can accommodate at least n more elements
     /** If necessary relocates existing task pointers or grows the ready task deque.

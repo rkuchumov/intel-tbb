@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "governor.h"
+#include "my_stat.h"
 #include "tbb_main.h"
 #include "scheduler.h"
 #include "market.h"
@@ -154,13 +155,14 @@ void governor::one_time_init() {
 #endif /* __TBB_SURVIVE_THREAD_SWITCH */
 }
 
-generic_scheduler* governor::init_scheduler( int num_threads, stack_size_type stack_size, bool auto_init ) {
+generic_scheduler* governor::init_scheduler( int num_threads, stack_size_type stack_size, bool auto_init, size_t min_task_pool_size) {
     one_time_init();
     generic_scheduler* s = theTLS.get();
     if( s ) {
         s->my_ref_count += 1;
         return s;
     }
+    generic_scheduler::min_task_pool_size = min_task_pool_size;
     bool default_concurrency_requested = num_threads == task_scheduler_init::automatic;
     if( default_concurrency_requested )
         num_threads = default_num_threads();
@@ -168,10 +170,18 @@ generic_scheduler* governor::init_scheduler( int num_threads, stack_size_type st
     s = generic_scheduler::create_master( a );
     __TBB_ASSERT(s, "Somehow a local scheduler creation for a master thread failed");
     s->my_auto_initialized = auto_init;
+
+    //////////////////////////////////////////////////////////////////////////////
+    init_thread_stat1();
+    start_watchdog();
+    a.advertise_new_work</*Spawned=*/false>();
+    //////////////////////////////////////////////////////////////////////////////
+
     return s;
 }
 
 void governor::terminate_scheduler( generic_scheduler* s, const task_scheduler_init* tsi_ptr ) {
+    stop_watchdog();
     __TBB_ASSERT( s == theTLS.get(), "Attempt to terminate non-local scheduler instance" );
     if (--(s->my_ref_count)) {
         // can't throw exception, because this is on dtor's call chain
@@ -284,11 +294,11 @@ __cilk_tbb_retcode governor::stack_op_handler( __cilk_tbb_stack_op op, void* dat
 using namespace internal;
 
 /** Left out-of-line for the sake of the backward binary compatibility **/
-void task_scheduler_init::initialize( int number_of_threads ) {
-    initialize( number_of_threads, 0 );
+void task_scheduler_init::initialize( int number_of_threads, size_t min_task_pool_size ) {
+    initialize( number_of_threads, 0, min_task_pool_size );
 }
 
-void task_scheduler_init::initialize( int number_of_threads, stack_size_type thread_stack_size ) {
+void task_scheduler_init::initialize( int number_of_threads, stack_size_type thread_stack_size, size_t min_task_pool_size ) {
 #if __TBB_TASK_GROUP_CONTEXT && TBB_USE_EXCEPTIONS
     uintptr_t new_mode = thread_stack_size & propagation_mode_mask;
 #endif
@@ -304,7 +314,7 @@ void task_scheduler_init::initialize( int number_of_threads, stack_size_type thr
                     "number_of_threads for task_scheduler_init must be automatic or positive" );
         if (blocking_terminate)
             governor::setBlockingTerminate(this);
-        internal::generic_scheduler *s = governor::init_scheduler( number_of_threads, thread_stack_size, /*auto_init=*/false );
+        internal::generic_scheduler *s = governor::init_scheduler( number_of_threads, thread_stack_size, /*auto_init=*/false, min_task_pool_size);
 #if __TBB_TASK_GROUP_CONTEXT && TBB_USE_EXCEPTIONS
         if ( s->master_outermost_level() ) {
             uintptr_t &vt = s->default_context()->my_version_and_traits;

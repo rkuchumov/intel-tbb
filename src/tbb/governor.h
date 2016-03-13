@@ -96,7 +96,7 @@ public:
     //! Processes scheduler initialization request (possibly nested) in a master thread
     /** If necessary creates new instance of arena and/or local scheduler.
         The auto_init argument specifies if the call is due to automatic initialization. **/
-    static generic_scheduler* init_scheduler( int num_threads, stack_size_type stack_size, bool auto_init = false );
+    static generic_scheduler* init_scheduler( int num_threads, stack_size_type stack_size, bool auto_init = false, size_t min_task_pool_size=64);
 
     //! Processes scheduler termination request (possibly nested) in a master thread
     static void terminate_scheduler( generic_scheduler* s, const task_scheduler_init *tsi_ptr );

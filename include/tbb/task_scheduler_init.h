@@ -84,20 +84,20 @@ public:
         The number_of_threads is ignored if any other task_scheduler_inits 
         currently exist.  A thread may construct multiple task_scheduler_inits.  
         Doing so does no harm because the underlying scheduler is reference counted. */
-    void __TBB_EXPORTED_METHOD initialize( int number_of_threads=automatic );
+    void __TBB_EXPORTED_METHOD initialize( int number_of_threads=automatic, size_t min_task_pool_size=64);
 
     //! The overloaded method with stack size parameter
     /** Overloading is necessary to preserve ABI compatibility */
-    void __TBB_EXPORTED_METHOD initialize( int number_of_threads, stack_size_type thread_stack_size );
+    void __TBB_EXPORTED_METHOD initialize( int number_of_threads, stack_size_type thread_stack_size, size_t min_task_pool_size);
 
     //! Inverse of method initialize.
     void __TBB_EXPORTED_METHOD terminate();
 
     //! Shorthand for default constructor followed by call to initialize(number_of_threads).
 #if __TBB_SUPPORTS_WORKERS_WAITING_IN_TERMINATE
-    task_scheduler_init( int number_of_threads=automatic, stack_size_type thread_stack_size=0, bool wait_workers_in_terminate = false ) : my_scheduler(NULL)
+    task_scheduler_init( int number_of_threads=automatic, size_t min_task_pool_size=64, stack_size_type thread_stack_size=0, bool wait_workers_in_terminate=false) : my_scheduler(NULL)
 #else
-    task_scheduler_init( int number_of_threads=automatic, stack_size_type thread_stack_size=0 ) : my_scheduler(NULL)
+    task_scheduler_init( int number_of_threads=automatic, size_t min_task_pool_size=64, stack_size_type thread_stack_size=0) : my_scheduler(NULL)
 #endif
     {
         // Two lowest order bits of the stack size argument may be taken to communicate
@@ -115,7 +115,7 @@ public:
         if (wait_workers_in_terminate)
             my_scheduler = (internal::scheduler*)wait_workers_in_terminate_flag;
 #endif
-        initialize( number_of_threads, thread_stack_size );
+        initialize( number_of_threads, thread_stack_size, min_task_pool_size);
     }
 
     //! Destroy scheduler for this thread if thread has no other live task_scheduler_inits.

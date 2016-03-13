@@ -50,7 +50,7 @@ __TBB_SYMBOL( _ZTSN3tbb4taskE )
 __TBB_SYMBOL( _ZTVN3tbb4taskE )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init19default_num_threadsEv )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEim )
-__TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEi )
+__TBB_SYMBOL( _ZN3tbb19task_scheduler_init10initializeEimm )
 __TBB_SYMBOL( _ZN3tbb19task_scheduler_init9terminateEv )
 #if __TBB_SCHEDULER_OBSERVER
 __TBB_SYMBOL( _ZN3tbb8internal26task_scheduler_observer_v37observeEb )
