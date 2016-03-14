@@ -1,14 +1,14 @@
 # Intel(R) Threading Building Blocks with modified task scheduler to allow for deque operations analysis.
 
-Right now scheduler with only 2 workers is supported. Before the execution of any operation with deque (push, pop, steal) workers specify it by setting flags in shared memory. When this operations is finished corresponding flags are also changed. Statistics is collected by the third thread that checks in infinite loop what workers are doing.
+Right now scheduler with only 2 workers is supported. Before executing any operation with deques (push, pop, steal) workers specify it by setting flags in shared memory. When this operation is finished corresponding flags are also changed. Statistics is collected by the third thread that checks in infinite loop what workers are doing.
 
 Statistics inforamtion includes:
-* the number of iterations of stattistic thread
+* the number of iterations of statistic thread
 * average number of deque operations per iteration
 * the number of concurrent executions of `push`, `pop` and `noop` and their probabilities
 * total number of `push`, `pop` and `steal` operations
 
-For example, output of `./statistics/fib 25 10` -- calculating 25-th Fibonacci number 10 times using recurrence formula.
+For example, `./statistics/fib 25 10` calculates 25-th Fibonacci number 10 times using recurrence formula and produces following output:
 
 ```
 ====================== Deques Stats =====================

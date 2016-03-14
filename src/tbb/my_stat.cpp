@@ -45,7 +45,7 @@ event_t dy[] = {
 
 uint32_t total[9];
 uint32_t op_delta[2];
-uint64_t cycles = 0;
+uint64_t iterations = 0;
 
 bool watchdog_stop;
 
@@ -72,7 +72,7 @@ void watchdog_exec()
         prev_cnt[0] = cur_cnt[0];
         prev_cnt[1] = cur_cnt[1];
 
-        cycles++;
+        iterations++;
     }
 }
 
@@ -97,10 +97,10 @@ void stop_watchdog()
         prob[i] = (double) total[i] / sum;
 
     std::cerr << "\n";
-    std::cerr << "cycles: " << cycles << "\n";
-    std::cerr << "operations per cycle:\nth0: "
-        << (double) op_delta[0] / cycles << "  th1: " 
-        << (double) op_delta[1] / cycles << "\n";
+    std::cerr << "iterations: " << iterations << "\n";
+    std::cerr << "operations per iteration:\nth0: "
+        << (double) op_delta[0] / iterations << "  th1: " 
+        << (double) op_delta[1] / iterations << "\n";
 
     std::cerr << "\n";
     std::cerr.precision(15);
