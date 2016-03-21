@@ -4,7 +4,10 @@
 #include <thread>
 #include <iomanip>
 
+#include "tbb/atomic.h"
 #include "tbb/enumerable_thread_specific.h"
+
+#define MAX_THREADS 8
 
 struct stat_t
 {
@@ -13,8 +16,9 @@ struct stat_t
     uint32_t push_cnt;
     uint32_t pop_cnt;
     uint32_t steal_cnt;
-} stat[2];
+} stat[MAX_THREADS];
 
+tbb::atomic<int> stat_size(0);
 thread_local int me;
 
 tbb::tbb_thread watchdog_handle;
@@ -44,7 +48,6 @@ event_t dy[] = {
 };
 
 uint32_t total[9];
-uint32_t op_delta[2];
 uint64_t iterations = 0;
 
 bool watchdog_stop;
@@ -52,8 +55,6 @@ bool watchdog_stop;
 void watchdog_exec()
 {
     stat_t cur[2];
-    uint64_t prev_cnt[2] = {0};
-    uint64_t cur_cnt[2] = {0};
 
     while (!watchdog_stop) {
         cur[0] = stat[0];
@@ -62,15 +63,6 @@ void watchdog_exec()
         for (int i = 0; i < 9; i++)
             if (cur[0].e == dx[i] && cur[1].e == dy[i])
                 total[i]++;
-
-        cur_cnt[0] = stat[0].push_cnt + stat[0].pop_cnt + stat[0].steal_cnt;
-        cur_cnt[1] = stat[1].push_cnt + stat[1].pop_cnt + stat[1].steal_cnt;
-
-        op_delta[0] += cur_cnt[0] - prev_cnt[0];
-        op_delta[1] += cur_cnt[1] - prev_cnt[1];
-
-        prev_cnt[0] = cur_cnt[0];
-        prev_cnt[1] = cur_cnt[1];
 
         iterations++;
     }
@@ -98,9 +90,13 @@ void stop_watchdog()
 
     std::cerr << "\n";
     std::cerr << "iterations: " << iterations << "\n";
-    std::cerr << "operations per iteration:\nth0: "
-        << (double) op_delta[0] / iterations << "  th1: " 
-        << (double) op_delta[1] / iterations << "\n";
+
+    long cnt[2];
+    cnt[0] = stat[0].push_cnt + stat[0].pop_cnt + stat[0].steal_cnt;
+    cnt[1] = stat[1].push_cnt + stat[1].pop_cnt + stat[1].steal_cnt;
+    std::cerr << "iterations per operation:\nth0: "
+        << (double) iterations / cnt[0] << "  th1: " 
+        << (double) iterations / cnt[1] << "\n";
 
     std::cerr << "\n";
     std::cerr.precision(15);
@@ -129,22 +125,12 @@ void stop_watchdog()
     std::cerr << "push: \t"  << stat[0].push_cnt + stat[1].push_cnt   << "\n";
     std::cerr << "pop: \t"   << stat[0].pop_cnt + stat[1].pop_cnt     << "\n";
     std::cerr << "steal: \t" << stat[0].steal_cnt + stat[1].steal_cnt << "\n";
-
     std::cerr << "\n";
-}
-
-void init_thread_stat1()
-{
-    me = 0;
-}
-
-void init_thread_stat2()
-{
-    me = 1;
 }
 
 void gather_stat(event_t e)
 {
+
     stat[me].e = e;
 
     if (e == STAT_PUSH)
@@ -153,4 +139,22 @@ void gather_stat(event_t e)
         stat[me].pop_cnt++;
     if (e == STAT_STEAL)
         stat[me].steal_cnt++;
+
+    // nanosleep((const struct timespec[]){{0, 1000L}}, NULL);
+}
+
+void init_stat_thread()
+{
+    int old_size;
+    do {
+        old_size = stat_size;
+    } while(stat_size.compare_and_swap(old_size + 1, old_size) != old_size);
+
+    if (old_size >= MAX_THREADS)
+        std::cerr << "MAX_THREADS constant is readched\n";
+
+    me = old_size;
+
+    if (old_size == 0)
+        start_watchdog();
 }

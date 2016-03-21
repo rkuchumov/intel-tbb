@@ -1,6 +1,6 @@
 CPP = g++
-FLAGS = -std=c++11 
-TBB_PATH = ../build/linux_intel64_gcc_cc4.8_libc2.19_kernel3.19.0_debug/
+FLAGS = -std=c++11
+TBB_PATH = ../build/linux_intel64_gcc_cc5.2.1_libc2.21_kernel4.2.0_debug/
 LIBS = $(TBB_PATH)libtbb_debug.so.2
 INCLUDE = -I../include
 
@@ -15,7 +15,7 @@ custom: custom.cpp
 
 .PHONY: run
 run: fib custom
-	export LD_LIBRARY_PATH=$(TBB_PATH) && ./fib 25 10
+	export LD_LIBRARY_PATH=$(TBB_PATH) && ./fib 20 3
 	export LD_LIBRARY_PATH=$(TBB_PATH) && ./custom 6 8 10
 
 .PHONY: clean

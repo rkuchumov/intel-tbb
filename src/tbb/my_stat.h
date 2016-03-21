@@ -8,13 +8,12 @@ enum event_t {
 	STAT_STEAL = 3
 };
 
-void start_watchdog();
-void stop_watchdog();
-
-void init_thread_stat1();
-void init_thread_stat2();
+void init_stat_thread();
 
 void gather_stat(event_t e);
+
+void start_watchdog();
+void stop_watchdog();
 
 #endif /* end of include guard: MY_STAT_H */
 

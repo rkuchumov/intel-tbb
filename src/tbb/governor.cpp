@@ -172,8 +172,7 @@ generic_scheduler* governor::init_scheduler( int num_threads, stack_size_type st
     s->my_auto_initialized = auto_init;
 
     //////////////////////////////////////////////////////////////////////////////
-    init_thread_stat1();
-    start_watchdog();
+    init_stat_thread();
     a.advertise_new_work</*Spawned=*/false>();
     //////////////////////////////////////////////////////////////////////////////
 

@@ -226,7 +226,7 @@ __RML_DECL_THREAD_ROUTINE private_worker::thread_routine( void* arg ) {
     int HWThreadIndex = __TBB_XBOX360_GetHardwareThreadIndex(i);
     XSetThreadProcessor(GetCurrentThread(), HWThreadIndex);
 #endif
-    init_thread_stat2();
+    init_stat_thread();
     self->run();
     return 0;
 }
